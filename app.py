@@ -19,7 +19,7 @@ OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Helper: Set Cell Margins (Padding)
+# Helper: Set Cell Margins (Padding) for Word
 def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
     tcPr = cell._element.get_or_add_tcPr()
     tcMar = OxmlElement('w:tcMar')
@@ -30,8 +30,8 @@ def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
         tcMar.append(node)
     tcPr.append(tcMar)
 
-# Helper: Set Cell Border
-def set_cell_border(cell, color="A0A0A0", sz="6", val="single"):
+# Helper: Set Cell Border for Word
+def set_cell_border(cell, color="1A73E8", sz="8", val="single"):
     tcPr = cell._element.get_or_add_tcPr()
     tcBorders = tcPr.first_child_found_in("w:tcBorders")
     if tcBorders is None:
@@ -46,16 +46,15 @@ def set_cell_border(cell, color="A0A0A0", sz="6", val="single"):
         element.set(qn('w:color'), color)
         tcBorders.append(element)
 
-# Generate Word Document (.docx) - Exact Sticker Size: 9.5 cm x 7.8 cm
+# Generate Word Document (.docx) - 6 Tags per Page Grid (2x3)
 def build_docx(items):
     doc = Document()
     
-    # Page setup for A4
     for section in doc.sections:
-        section.top_margin = Cm(1.0)
-        section.bottom_margin = Cm(1.0)
-        section.left_margin = Cm(1.0)
-        section.right_margin = Cm(1.0)
+        section.top_margin = Cm(0.8)
+        section.bottom_margin = Cm(0.8)
+        section.left_margin = Cm(0.8)
+        section.right_margin = Cm(0.8)
 
     chunk_size = 6
     chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
@@ -72,22 +71,21 @@ def build_docx(items):
             row_idx = i // 2
             col_idx = i % 2
             
-            # Set exact height & width for each cell (9.5 cm x 7.8 cm)
-            grid_table.rows[row_idx].height = Cm(7.8)
+            grid_table.rows[row_idx].height = Cm(8.2)
             cell = grid_table.cell(row_idx, col_idx)
             cell.width = Cm(9.5)
 
             set_cell_margins(cell, top=80, bottom=80, left=100, right=100)
-            set_cell_border(cell, color="808080", sz="6")
+            set_cell_border(cell, color="1A73E8", sz="8")
 
             fields = [
                 ("Model", row.get('Model', 'N/A')),
                 ("Serial No", row.get('Serial No', 'N/A')),
-                ("Processor Details", row.get('Processor Details', 'N/A')),
+                ("Processor", row.get('Processor Details', 'N/A')),
                 ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
                 ("IP No", row.get('IP No', 'N/A')),
                 ("Hostname", row.get('Hostname', 'N/A')),
-                ("MAC address", row.get('MAC address', 'N/A'))
+                ("MAC Address", row.get('MAC address', 'N/A'))
             ]
 
             qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
@@ -113,7 +111,7 @@ def build_docx(items):
             for label, val in fields:
                 p_item = cell.add_paragraph()
                 p_item.paragraph_format.space_before = Pt(0)
-                p_item.paragraph_format.space_after = Pt(2)
+                p_item.paragraph_format.space_after = Pt(1)
 
                 lbl_run = p_item.add_run(f"{label}: ")
                 lbl_run.bold = True
@@ -139,7 +137,7 @@ def build_docx(items):
             p_bar_txt = cell_bar.add_paragraph()
             p_bar_txt.alignment = WD_ALIGN_PARAGRAPH.CENTER
             txt_run = p_bar_txt.add_run(f"*{serial_barcode}*")
-            txt_run.font.size = Pt(8.0)
+            txt_run.font.size = Pt(7.5)
 
             if os.path.exists(qr_file): os.remove(qr_file)
             if os.path.exists(barcode_file): os.remove(barcode_file)
@@ -148,57 +146,87 @@ def build_docx(items):
     doc.save(output_path)
     return output_path
 
-# Generate PDF Document (.pdf) - Exact Sticker Size: 9.5 cm x 7.8 cm
+# Generate PDF Document (.pdf) - Perfect 2x3 Grid (6 Stickers per A4 Page)
 def build_pdf(items):
     temp_images = []
-    tags_html = ""
+    
+    chunk_size = 6
+    chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+    
+    pages_html = ""
 
-    for i, row in enumerate(items):
-        fields = [
-            ("Model", row.get('Model', 'N/A')),
-            ("Serial No", row.get('Serial No', 'N/A')),
-            ("Processor Details", row.get('Processor Details', 'N/A')),
-            ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
-            ("IP No", row.get('IP No', 'N/A')),
-            ("Hostname", row.get('Hostname', 'N/A')),
-            ("MAC address", row.get('MAC address', 'N/A'))
-        ]
-
-        qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
-        qr_file = os.path.abspath(f"temp_qr_pdf_{i}.png")
-        bar_base = os.path.abspath(f"temp_bar_pdf_{i}")
-
-        qr_img = qrcode.make(qr_content)
-        qr_img.save(qr_file)
-
-        code128 = barcode.get_barcode_class('code128')
-        serial_barcode = str(row.get('Serial No', '000000'))
-        barcode_obj = code128(serial_barcode, writer=ImageWriter())
-        barcode_file = barcode_obj.save(bar_base, options={"write_text": False})
-
-        temp_images.extend([qr_file, barcode_file])
-
-        tags_html += f"""
-        <div class="tag-box">
-            <div class="title">IT ASSET TAG</div>
-            <div class="field"><b>Model:</b> {row.get('Model', 'N/A')}</div>
-            <div class="field"><b>Serial No:</b> {row.get('Serial No', 'N/A')}</div>
-            <div class="field"><b>Processor Details:</b> {row.get('Processor Details', 'N/A')}</div>
-            <div class="field"><b>Storage:</b> {row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}</div>
-            <div class="field"><b>IP No:</b> {row.get('IP No', 'N/A')}</div>
-            <div class="field"><b>Hostname:</b> {row.get('Hostname', 'N/A')}</div>
-            <div class="field"><b>MAC address:</b> {row.get('MAC address', 'N/A')}</div>
+    for page_idx, chunk in enumerate(chunks):
+        rows_html = ""
+        
+        # Process in pairs of 2 items per row
+        for r in range(0, len(chunk), 2):
+            pair = chunk[r:r+2]
+            cols_html = ""
             
-            <table class="img-table">
-                <tr>
-                    <td style="width:35%; text-align:left; vertical-align:middle;">
-                        <img src="{qr_file}" width="65" height="65" />
-                    </td>
-                    <td style="width:65%; text-align:center; vertical-align:middle;">
-                        <img src="{barcode_file}" width="120" height="32" /><br>
-                        <span style="font-size: 8px; font-weight: bold;">*{serial_barcode}*</span>
-                    </td>
-                </tr>
+            for c_idx, row in enumerate(pair):
+                idx = page_idx * 6 + r + c_idx
+                
+                fields = [
+                    ("Model", row.get('Model', 'N/A')),
+                    ("Serial No", row.get('Serial No', 'N/A')),
+                    ("Processor", row.get('Processor Details', 'N/A')),
+                    ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
+                    ("IP No", row.get('IP No', 'N/A')),
+                    ("Hostname", row.get('Hostname', 'N/A')),
+                    ("MAC Address", row.get('MAC address', 'N/A'))
+                ]
+
+                qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
+                qr_file = os.path.abspath(f"temp_qr_pdf_{idx}.png")
+                bar_base = os.path.abspath(f"temp_bar_pdf_{idx}")
+
+                qr_img = qrcode.make(qr_content)
+                qr_img.save(qr_file)
+
+                code128 = barcode.get_barcode_class('code128')
+                serial_barcode = str(row.get('Serial No', '000000'))
+                barcode_obj = code128(serial_barcode, writer=ImageWriter())
+                barcode_file = barcode_obj.save(bar_base, options={"write_text": False})
+
+                temp_images.extend([qr_file, barcode_file])
+
+                sticker_inner = f"""
+                <div class="sticker-card">
+                    <div class="sticker-header">IT ASSET TAG</div>
+                    <table class="info-table">
+                        <tr><td class="lbl">Model:</td><td class="val">{row.get('Model', 'N/A')}</td></tr>
+                        <tr><td class="lbl">Serial No:</td><td class="val">{row.get('Serial No', 'N/A')}</td></tr>
+                        <tr><td class="lbl">Processor:</td><td class="val">{row.get('Processor Details', 'N/A')}</td></tr>
+                        <tr><td class="lbl">Storage:</td><td class="val">{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}</td></tr>
+                        <tr><td class="lbl">IP No:</td><td class="val">{row.get('IP No', 'N/A')}</td></tr>
+                        <tr><td class="lbl">Hostname:</td><td class="val">{row.get('Hostname', 'N/A')}</td></tr>
+                        <tr><td class="lbl">MAC Addr:</td><td class="val">{row.get('MAC address', 'N/A')}</td></tr>
+                    </table>
+                    <table class="code-table">
+                        <tr>
+                            <td style="width: 35%; text-align: left; vertical-align: bottom;">
+                                <img src="{qr_file}" width="58" height="58" />
+                            </td>
+                            <td style="width: 65%; text-align: center; vertical-align: bottom;">
+                                <img src="{barcode_file}" width="115" height="28" /><br/>
+                                <span class="serial-txt">*{serial_barcode}*</span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                """
+                cols_html += f'<td class="sticker-td">{sticker_inner}</td>'
+            
+            if len(pair) == 1:
+                cols_html += '<td class="sticker-td" style="border:none;"></td>'
+
+            rows_html += f'<tr>{cols_html}</tr>'
+
+        page_break_css = 'page-break-after: always;' if page_idx < len(chunks) - 1 else ''
+        pages_html += f"""
+        <div style="{page_break_css}">
+            <table class="page-grid">
+                {rows_html}
             </table>
         </div>
         """
@@ -207,26 +235,76 @@ def build_pdf(items):
     <html>
     <head>
         <style>
-            @page {{ size: A4; margin: 0.6cm; }}
-            body {{ font-family: Helvetica, Arial, sans-serif; margin:0; padding:0; }}
-            .tag-box {{
-                width: 9.5cm;
-                height: 7.8cm;
-                border: 1px solid #333;
-                padding: 8px 10px;
-                margin: 4px;
-                display: inline-block;
-                vertical-align: top;
-                box-sizing: border-box;
-                overflow: hidden;
+            @page {{
+                size: A4 portrait;
+                margin: 0.8cm 0.6cm 0.8cm 0.6cm;
             }}
-            .title {{ font-weight: bold; font-size: 11px; margin-bottom: 5px; text-decoration: underline; }}
-            .field {{ font-size: 8.5px; margin-bottom: 3px; line-height: 1.1; }}
-            .img-table {{ width: 100%; margin-top: 6px; border-collapse: collapse; }}
+            body {{
+                font-family: Helvetica, Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                background-color: #ffffff;
+            }}
+            .page-grid {{
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 8px 10px;
+            }}
+            .sticker-td {{
+                width: 50%;
+                vertical-align: top;
+                padding: 0;
+            }}
+            .sticker-card {{
+                border: 1px solid #1a73e8;
+                padding: 6px 8px;
+                height: 8.2cm;
+                box-sizing: border-box;
+                background-color: #ffffff;
+            }}
+            .sticker-header {{
+                background-color: #1a73e8;
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 11px;
+                text-align: center;
+                padding: 3px 0;
+                margin-bottom: 6px;
+                letter-spacing: 0.5px;
+            }}
+            .info-table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 4px;
+            }}
+            .info-table td {{
+                font-size: 8.5px;
+                padding: 2px 0;
+                vertical-align: top;
+            }}
+            .lbl {{
+                font-weight: bold;
+                color: #222222;
+                width: 30%;
+            }}
+            .val {{
+                color: #000000;
+                width: 70%;
+            }}
+            .code-table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 4px;
+            }}
+            .serial-txt {{
+                font-size: 7.5px;
+                font-weight: bold;
+                color: #333333;
+            }}
         </style>
     </head>
     <body>
-        {tags_html}
+        {pages_html}
     </body>
     </html>
     """
