@@ -20,7 +20,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # Helper: Word Cell Margins (Padding)
-def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
+def set_cell_margins(cell, top=50, bottom=50, left=70, right=70):
     tcPr = cell._element.get_or_add_tcPr()
     tcMar = OxmlElement('w:tcMar')
     for m, val in [('top', top), ('bottom', bottom), ('left', left), ('right', right)]:
@@ -46,7 +46,7 @@ def set_cell_border(cell, color="1A73E8", sz="8", val="single"):
         element.set(qn('w:color'), color)
         tcBorders.append(element)
 
-# Generate Word Document (.docx) - 9cm x 8cm Grid
+# Generate Word Document (.docx)
 def build_docx(items):
     doc = Document()
     
@@ -75,7 +75,7 @@ def build_docx(items):
             cell = grid_table.cell(row_idx, col_idx)
             cell.width = Cm(9.0)
 
-            set_cell_margins(cell, top=60, bottom=60, left=80, right=80)
+            set_cell_margins(cell, top=50, bottom=50, left=70, right=70)
             set_cell_border(cell, color="1A73E8", sz="8")
 
             fields = [
@@ -150,7 +150,7 @@ def build_docx(items):
     doc.save(output_path)
     return output_path
 
-# Generate PDF Document (.pdf) - 9cm x 8cm Layout in Arial
+# Generate PDF Document (.pdf) - Perfect Image-Matching Blue Table Grid Layout
 def build_pdf(items):
     temp_images = []
     
@@ -170,16 +170,16 @@ def build_pdf(items):
                 idx = page_idx * 6 + r + c_idx
                 
                 fields = [
-                    ("Model", row.get('Model', 'N/A')),
-                    ("Serial No", row.get('Serial No', 'N/A')),
-                    ("Processor Details", row.get('Processor Details', 'N/A')),
-                    ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
-                    ("IP No", row.get('IP No', 'N/A')),
-                    ("Hostname", row.get('Hostname', 'N/A')),
-                    ("MAC address", row.get('MAC address', 'N/A'))
+                    ("Model:", row.get('Model', 'N/A')),
+                    ("Serial No:", row.get('Serial No', 'N/A')),
+                    ("Processor Details:", row.get('Processor Details', 'N/A')),
+                    ("Storage:", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
+                    ("IP No:", row.get('IP No', 'N/A')),
+                    ("Hostname:", row.get('Hostname', 'N/A')),
+                    ("MAC address:", row.get('MAC address', 'N/A'))
                 ]
 
-                qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
+                qr_content = "\n".join([f"{l.replace(':','')}: {v}" for l, v in fields])
                 qr_file = os.path.abspath(f"temp_qr_pdf_{idx}.png")
                 bar_base = os.path.abspath(f"temp_bar_pdf_{idx}")
 
@@ -193,40 +193,37 @@ def build_pdf(items):
 
                 temp_images.extend([qr_file, barcode_file])
 
-                fields_html = ""
+                # Build exact row table structure
+                field_rows = ""
                 for label, val in fields:
-                    fields_html += f"""
+                    field_rows += f"""
                     <tr>
-                        <td class="lbl">{label}:</td>
-                        <td class="val">{val}</td>
+                        <td class="lbl-td">{label}</td>
+                        <td class="val-td">{val}</td>
                     </tr>
                     """
 
-                sticker_inner = f"""
-                <div class="sticker-card">
-                    <div class="sticker-header">IT ASSET TAG</div>
-                    <div class="sticker-content">
-                        <table class="info-table">
-                            {fields_html}
-                        </table>
-                        <table class="code-table">
-                            <tr>
-                                <td style="width: 35%; text-align: left; vertical-align: bottom;">
-                                    <img src="{qr_file}" width="52" height="52" />
-                                </td>
-                                <td style="width: 65%; text-align: center; vertical-align: bottom;">
-                                    <img src="{barcode_file}" width="120" height="25" /><br/>
-                                    <span class="serial-txt">*{serial_barcode}*</span>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
+                sticker_table = f"""
+                <table class="sticker-table">
+                    <tr>
+                        <td colspan="2" class="header-td">IT ASSET TAG</td>
+                    </tr>
+                    {field_rows}
+                    <tr>
+                        <td class="qr-td">
+                            <img src="{qr_file}" width="50" height="50" />
+                        </td>
+                        <td class="bar-td">
+                            <img src="{barcode_file}" width="115" height="26" /><br/>
+                            <span class="serial-txt">*{serial_barcode}*</span>
+                        </td>
+                    </tr>
+                </table>
                 """
-                cols_html += f'<td class="sticker-td">{sticker_inner}</td>'
+                cols_html += f'<td class="grid-col">{sticker_table}</td>'
             
             if len(pair) == 1:
-                cols_html += '<td class="sticker-td"></td>'
+                cols_html += '<td class="grid-col"></td>'
 
             rows_html += f'<tr>{cols_html}</tr>'
 
@@ -245,7 +242,7 @@ def build_pdf(items):
         <style>
             @page {{
                 size: A4 portrait;
-                margin: 1.2cm 0.8cm 1.2cm 0.8cm;
+                margin: 1.0cm 0.7cm 1.0cm 0.7cm;
             }}
             body {{
                 font-family: Arial, Helvetica, sans-serif;
@@ -256,62 +253,70 @@ def build_pdf(items):
             .page-grid {{
                 width: 100%;
                 border-collapse: separate;
-                border-spacing: 0.6cm 0.5cm;
+                border-spacing: 0.5cm 0.4cm;
             }}
-            .sticker-td {{
+            .grid-col {{
                 width: 9.0cm;
                 vertical-align: top;
                 padding: 0;
             }}
-            .sticker-card {{
-                border: 1.5pt solid #1a73e8;
-                padding: 0;
-                background-color: #ffffff;
+            
+            /* Sticker Main Table Styling - Matches Uploaded Design */
+            .sticker-table {{
+                width: 9.0cm;
+                height: 8.0cm;
+                border-collapse: collapse;
+                border: 2px solid #1a73e8;
                 font-family: Arial, Helvetica, sans-serif;
+                background-color: #ffffff;
             }}
-            .sticker-header {{
+            .header-td {{
                 background-color: #1a73e8;
                 color: #ffffff;
                 font-family: Arial, Helvetica, sans-serif;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 11pt;
                 text-align: center;
                 padding: 4px 0;
                 letter-spacing: 0.5px;
             }}
-            .sticker-content {{
-                padding: 6px 8px;
-            }}
-            .info-table {{
-                width: 100%;
-                border-collapse: collapse;
-            }}
-            .info-table td {{
-                font-family: Arial, Helvetica, sans-serif;
+            .lbl-td {{
                 font-size: 8pt;
-                line-height: 1.2;
-                padding: 1.5px 0;
-                vertical-align: top;
-            }}
-            .lbl {{
                 font-weight: bold;
                 color: #000000;
-                width: 38%;
+                width: 36%;
+                border-top: 1px solid #1a73e8;
+                border-right: 1px solid #1a73e8;
+                padding: 3px 5px;
+                vertical-align: middle;
             }}
-            .val {{
+            .val-td {{
+                font-size: 8pt;
                 color: #111111;
-                width: 62%;
+                width: 64%;
+                border-top: 1px solid #1a73e8;
+                padding: 3px 5px;
+                vertical-align: middle;
             }}
-            .code-table {{
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 4px;
+            .qr-td {{
+                width: 36%;
+                border-top: 2px solid #1a73e8;
+                border-right: 1px solid #1a73e8;
+                text-align: center;
+                vertical-align: middle;
+                padding: 4px;
+            }}
+            .bar-td {{
+                width: 64%;
+                border-top: 2px solid #1a73e8;
+                text-align: center;
+                vertical-align: middle;
+                padding: 4px;
             }}
             .serial-txt {{
-                font-family: Arial, Helvetica, sans-serif;
                 font-size: 7.5pt;
                 font-weight: bold;
-                color: #222222;
+                color: #111111;
             }}
         </style>
     </head>
