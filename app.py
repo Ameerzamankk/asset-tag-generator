@@ -10,15 +10,16 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from flask import Flask, render_template, request, send_file
+from xhtml2pdf import pisa
 
 app = Flask(__name__)
 
-# ഫോൾഡറുകൾ സജ്ജമാക്കുന്നു
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# Word Document Formatting Helpers
 def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
     tcPr = cell._element.get_or_add_tcPr()
     tcMar = OxmlElement('w:tcMar')
@@ -44,32 +45,27 @@ def set_cell_border(cell, color="A0A0A0", sz="6", val="single"):
         element.set(qn('w:color'), color)
         tcBorders.append(element)
 
-def generate_docx_from_excel(excel_path):
-    df = pd.read_excel(excel_path)
+# Generate Word Document (.docx)
+def build_docx(items):
     doc = Document()
-
-    # Page Margins
     for section in doc.sections:
         section.top_margin = Inches(0.35)
         section.bottom_margin = Inches(0.35)
         section.left_margin = Inches(0.35)
         section.right_margin = Inches(0.35)
 
-    # 6 എണ്ണം വീതമുള്ള ഗ്രൂപ്പുകളാക്കുന്നു
     chunk_size = 6
-    chunks = [df[i:i + chunk_size] for i in range(0, len(df), chunk_size)]
+    chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
 
     for page_idx, chunk in enumerate(chunks):
         if page_idx > 0:
             doc.add_page_break()
 
-        # 3 Rows x 2 Cols Layout
         grid_table = doc.add_table(rows=3, cols=2)
         grid_table.alignment = WD_TABLE_ALIGNMENT.CENTER
         grid_table.autofit = False
 
-        items = chunk.to_dict('records')
-        for i, row in enumerate(items):
+        for i, row in enumerate(chunk):
             row_idx = i // 2
             col_idx = i % 2
             cell = grid_table.cell(row_idx, col_idx)
@@ -78,41 +74,25 @@ def generate_docx_from_excel(excel_path):
             set_cell_margins(cell, top=60, bottom=60, left=80, right=80)
             set_cell_border(cell, color="A0A0A0", sz="6")
 
-            def get_val(column_name):
-                val = row.get(column_name, '')
-                return str(val).strip() if pd.notna(val) else 'N/A'
-
-            model = get_val('Model')
-            serial = get_val('Serial No')
-            ram = get_val('RAM')
-            processor = get_val('Processor Details')
-            harddisk = get_val('Harddisk')
-            ssd = get_val('SSD')
-            ip = get_val('IP No')
-            hostname = get_val('Hostname')
-            mac = get_val('MAC address')
-
-            storage_combined = f"{harddisk} | {ssd} | {ram}"
-
             fields = [
-                ("Model", model),
-                ("Serial No", serial),
-                ("Processor Details", processor),
-                ("Storage", storage_combined),
-                ("IP No", ip),
-                ("Hostname", hostname),
-                ("MAC address", mac)
+                ("Model", row.get('Model', 'N/A')),
+                ("Serial No", row.get('Serial No', 'N/A')),
+                ("Processor Details", row.get('Processor Details', 'N/A')),
+                ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
+                ("IP No", row.get('IP No', 'N/A')),
+                ("Hostname", row.get('Hostname', 'N/A')),
+                ("MAC address", row.get('MAC address', 'N/A'))
             ]
 
-            qr_content = "\n".join([f"{label}: {val}" for label, val in fields])
-            qr_file = f"temp_qr_{page_idx}_{i}.png"
-            bar_base = f"temp_bar_{page_idx}_{i}"
+            qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
+            qr_file = os.path.abspath(f"temp_qr_{page_idx}_{i}.png")
+            bar_base = os.path.abspath(f"temp_bar_{page_idx}_{i}")
 
             qr_img = qrcode.make(qr_content)
             qr_img.save(qr_file)
 
             code128 = barcode.get_barcode_class('code128')
-            serial_barcode = serial if serial != 'N/A' else '000000'
+            serial_barcode = str(row.get('Serial No', '000000'))
             barcode_obj = code128(serial_barcode, writer=ImageWriter())
             barcode_file = barcode_obj.save(bar_base, options={"write_text": False})
 
@@ -123,26 +103,18 @@ def generate_docx_from_excel(excel_path):
             run_title = p.add_run("IT ASSET TAG\n")
             run_title.bold = True
             run_title.font.size = Pt(10.5)
-            run_title.font.name = 'Arial'
 
             for label, val in fields:
                 p_item = cell.add_paragraph()
                 p_item.paragraph_format.space_before = Pt(0)
                 p_item.paragraph_format.space_after = Pt(1)
-                p_item.paragraph_format.line_spacing = 1.0
 
                 lbl_run = p_item.add_run(f"{label}: ")
                 lbl_run.bold = True
                 lbl_run.font.size = Pt(8.0)
-                lbl_run.font.name = 'Arial'
 
-                val_run = p_item.add_run(val)
+                val_run = p_item.add_run(str(val))
                 val_run.font.size = Pt(8.0)
-                val_run.font.name = 'Arial'
-
-            p_space = cell.add_paragraph()
-            p_space.paragraph_format.space_before = Pt(2)
-            p_space.paragraph_format.space_after = Pt(0)
 
             bottom_table = cell.add_table(rows=1, cols=2)
             bottom_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -160,38 +132,163 @@ def generate_docx_from_excel(excel_path):
 
             p_bar_txt = cell_bar.add_paragraph()
             p_bar_txt.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_bar_txt.paragraph_format.space_before = Pt(1)
-            p_bar_txt.paragraph_format.space_after = Pt(0)
-            txt_run = p_bar_txt.add_run(f"*{serial}*")
+            txt_run = p_bar_txt.add_run(f"*{serial_barcode}*")
             txt_run.font.size = Pt(7.5)
-            txt_run.font.name = 'Arial'
 
-            if os.path.exists(qr_file):
-                os.remove(qr_file)
-            if os.path.exists(barcode_file):
-                os.remove(barcode_file)
+            if os.path.exists(qr_file): os.remove(qr_file)
+            if os.path.exists(barcode_file): os.remove(barcode_file)
 
-    output_path = os.path.join(OUTPUT_FOLDER, "Bulk_Asset_Tags.docx")
+    output_path = os.path.join(OUTPUT_FOLDER, "Asset_Tags.docx")
     doc.save(output_path)
+    return output_path
+
+# Generate PDF Document (.pdf)
+def build_pdf(items):
+    temp_images = []
+    tags_html = ""
+
+    for i, row in enumerate(items):
+        fields = [
+            ("Model", row.get('Model', 'N/A')),
+            ("Serial No", row.get('Serial No', 'N/A')),
+            ("Processor Details", row.get('Processor Details', 'N/A')),
+            ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
+            ("IP No", row.get('IP No', 'N/A')),
+            ("Hostname", row.get('Hostname', 'N/A')),
+            ("MAC address", row.get('MAC address', 'N/A'))
+        ]
+
+        qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
+        qr_file = os.path.abspath(f"temp_qr_pdf_{i}.png")
+        bar_base = os.path.abspath(f"temp_bar_pdf_{i}")
+
+        qr_img = qrcode.make(qr_content)
+        qr_img.save(qr_file)
+
+        code128 = barcode.get_barcode_class('code128')
+        serial_barcode = str(row.get('Serial No', '000000'))
+        barcode_obj = code128(serial_barcode, writer=ImageWriter())
+        barcode_file = barcode_obj.save(bar_base, options={"write_text": False})
+
+        temp_images.extend([qr_file, barcode_file])
+
+        tags_html += f"""
+        <div class="tag-box">
+            <div class="title">IT ASSET TAG</div>
+            <div class="field"><b>Model:</b> {row.get('Model', 'N/A')}</div>
+            <div class="field"><b>Serial No:</b> {row.get('Serial No', 'N/A')}</div>
+            <div class="field"><b>Processor Details:</b> {row.get('Processor Details', 'N/A')}</div>
+            <div class="field"><b>Storage:</b> {row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}</div>
+            <div class="field"><b>IP No:</b> {row.get('IP No', 'N/A')}</div>
+            <div class="field"><b>Hostname:</b> {row.get('Hostname', 'N/A')}</div>
+            <div class="field"><b>MAC address:</b> {row.get('MAC address', 'N/A')}</div>
+            
+            <table class="img-table">
+                <tr>
+                    <td style="width:35%; text-align:left;">
+                        <img src="{qr_file}" width="60" height="60" />
+                    </td>
+                    <td style="width:65%; text-align:center;">
+                        <img src="{barcode_file}" width="110" height="30" /><br>
+                        <span style="font-size: 8px;">*{serial_barcode}*</span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        """
+
+    html_full = f"""
+    <html>
+    <head>
+        <style>
+            @page {{ size: A4; margin: 0.5cm; }}
+            body {{ font-family: Helvetica, Arial, sans-serif; margin:0; padding:0; }}
+            .tag-box {{
+                width: 45%;
+                border: 1px solid #000;
+                padding: 6px;
+                margin: 4px;
+                display: inline-block;
+                vertical-align: top;
+                box-sizing: border-box;
+            }}
+            .title {{ font-weight: bold; font-size: 11px; margin-bottom: 4px; }}
+            .field {{ font-size: 8px; margin-bottom: 2px; }}
+            .img-table {{ width: 100%; margin-top: 5px; border-collapse: collapse; }}
+        </style>
+    </head>
+    <body>
+        {tags_html}
+    </body>
+    </html>
+    """
+
+    output_path = os.path.join(OUTPUT_FOLDER, "Asset_Tags.pdf")
+    with open(output_path, "w+b") as out_f:
+        pisa.CreatePDF(html_full, dest=out_f)
+
+    for img in temp_images:
+        if os.path.exists(img): os.remove(img)
+
     return output_path
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return 'എക്സെൽ ഫയൽ അപ്‌ലോഡ് ചെയ്തിട്ടില്ല!'
-    file = request.files['file']
-    if file.filename == '':
-        return 'ഫയൽ ഒന്നും സെലക്ട് ചെയ്തിട്ടില്ല!'
+@app.route('/generate', methods=['POST'])
+def generate():
+    input_type = request.form.get('input_type')
+    file_type = request.form.get('file_type')
 
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
+    items = []
 
-    output_docx = generate_docx_from_excel(file_path)
-    return send_file(output_docx, as_attachment=True)
+    # 1. Excel File Upload
+    if input_type == 'excel':
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            return "No excel file selected!"
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(file_path)
+        
+        df = pd.read_excel(file_path)
+        items = df.to_dict('records')
+
+    # 2. Direct Web Entry (Manual / Dynamic Rows)
+    elif input_type == 'manual':
+        models = request.form.getlist('model[]')
+        serials = request.form.getlist('serial[]')
+        processors = request.form.getlist('processor[]')
+        rams = request.form.getlist('ram[]')
+        harddisks = request.form.getlist('harddisk[]')
+        ssds = request.form.getlist('ssd[]')
+        ips = request.form.getlist('ip[]')
+        hostnames = request.form.getlist('hostname[]')
+        macs = request.form.getlist('mac[]')
+
+        for i in range(len(models)):
+            if models[i].strip() or serials[i].strip():
+                items.append({
+                    'Model': models[i],
+                    'Serial No': serials[i],
+                    'Processor Details': processors[i],
+                    'RAM': rams[i],
+                    'Harddisk': harddisks[i],
+                    'SSD': ssds[i],
+                    'IP No': ips[i],
+                    'Hostname': hostnames[i],
+                    'MAC address': macs[i]
+                })
+
+    if not items:
+        return "No data provided!"
+
+    if file_type == 'word':
+        out_file = build_docx(items)
+        return send_file(out_file, as_attachment=True)
+    else:
+        out_file = build_pdf(items)
+        return send_file(out_file, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
