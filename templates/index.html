@@ -1,57 +1,309 @@
 <!DOCTYPE html>
-<html lang="ml">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IT Asset Tag Generator</title>
+    <!-- HTML5 QR Code & Barcode Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f7f6;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            width: 380px;
-        }
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        input[type="file"] {
-            margin-bottom: 20px;
-            width: 100%;
-        }
-        button {
-            background-color: #007bff;
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f0f2f5; margin: 0; padding: 15px; display: flex; justify-content: center; }
+        .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 650px; }
+        h2 { text-align: center; color: #1a73e8; margin-top: 0; font-size: 22px; }
+        
+        .tab-buttons { display: flex; margin-bottom: 20px; border-bottom: 2px solid #e0e0e0; }
+        .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-size: 15px; font-weight: bold; color: #666; cursor: pointer; }
+        .tab-btn.active { color: #1a73e8; border-bottom: 3px solid #1a73e8; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .form-group { margin-bottom: 12px; }
+        label { font-size: 13px; font-weight: 600; color: #333; display: block; margin-bottom: 4px; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+        
+        .input-with-btn { display: flex; gap: 5px; }
+        .scan-btn { background: #6f42c1; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; white-space: nowrap; }
+        .scan-btn:hover { background: #593196; }
+
+        .scan-qr-tag-btn {
+            background: #17a2b8;
             color: white;
             border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 5px;
+            padding: 8px 12px;
+            border-radius: 6px;
             cursor: pointer;
-            width: 100%;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
         }
-        button:hover {
-            background-color: #0056b3;
+        .scan-qr-tag-btn:hover { background: #138496; }
+
+        .note-box {
+            background-color: #e8f0fe;
+            border-left: 4px solid #1a73e8;
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #333;
         }
+        .note-box code {
+            background: #d0e1fd;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+            color: #1a73e8;
+        }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        .manual-row { background: #f8f9fa; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; position: relative; }
+        .row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .remove-btn { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+        .add-row-btn { background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 15px; width: 100%; }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; color: white; cursor: pointer; transition: 0.2s; text-align: center; }
+        .btn-word { background-color: #2b579a; }
+        .btn-word:hover { background-color: #1e3c6b; }
+        .btn-pdf { background-color: #d93025; }
+        .btn-pdf:hover { background-color: #a51d12; }
+
+        /* Camera Scanner Modal Overlay */
+        #scanner-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+        #reader-container { background: white; padding: 15px; border-radius: 8px; width: 90%; max-width: 400px; text-align: center; }
+        #reader { width: 100%; }
+        .close-scanner-btn { margin-top: 10px; background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>IT Asset Tag Generator</h2>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept=".xlsx" required>
-            <button type="submit">Word ഫയൽ ഡൗൺലോഡ് ചെയ്യുക</button>
+
+<div class="container">
+    <h2>IT Asset Tag Generator</h2>
+
+    <!-- Tabs Header -->
+    <div class="tab-buttons">
+        <button class="tab-btn active" onclick="switchTab('excel')">Excel Upload</button>
+        <button class="tab-btn" onclick="switchTab('manual')">Direct Entry</button>
+    </div>
+
+    <!-- 1. Excel Upload Tab -->
+    <div id="excel-tab" class="tab-content active">
+        <div class="note-box">
+            <strong>📌 Required Excel Column Headers:</strong><br>
+            <span style="display:inline-block; margin-top:5px; line-height: 1.8;">
+                <code>Model</code>, <code>Serial No</code>, <code>Processor Details</code>, <code>RAM</code>, <code>Harddisk</code>, <code>SSD</code>, <code>IP No</code>, <code>Hostname</code>, <code>MAC address</code>
+            </span>
+        </div>
+
+        <form action="/generate" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="input_type" value="excel">
+            <div class="form-group">
+                <label>Upload Excel File (.xlsx)</label>
+                <input type="file" name="file" accept=".xlsx" required>
+            </div>
+            <div class="btn-group">
+                <button type="submit" name="file_type" value="word" class="btn btn-word">Word (.docx)</button>
+                <button type="submit" name="file_type" value="pdf" class="btn btn-pdf">PDF (.pdf)</button>
+            </div>
         </form>
     </div>
+
+    <!-- 2. Direct Entry Tab -->
+    <div id="manual-tab" class="tab-content">
+        <form action="/generate" method="post">
+            <input type="hidden" name="input_type" value="manual">
+            
+            <div id="manual-rows-container">
+                <!-- Dynamic Rows -->
+            </div>
+
+            <button type="button" class="add-row-btn" onclick="addManualRow()">+ Add Another Tag</button>
+
+            <div class="btn-group">
+                <button type="submit" name="file_type" value="word" class="btn btn-word">Word (.docx)</button>
+                <button type="submit" name="file_type" value="pdf" class="btn btn-pdf">PDF (.pdf)</button>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+<!-- Camera Scanner Modal Overlay -->
+<div id="scanner-modal">
+    <div id="reader-container">
+        <h3 id="scanner-title">📷 Scan Code</h3>
+        <div id="reader"></div>
+        <button class="close-scanner-btn" onclick="closeScanner()">Close Camera</button>
+    </div>
+</div>
+
+<script>
+    let activeScannerTarget = null;
+    let scanMode = 'serial'; // 'serial' or 'full_qr'
+    let html5QrCode = null;
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        if(tabName === 'excel') {
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            document.getElementById('excel-tab').classList.add('active');
+        } else {
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            document.getElementById('manual-tab').classList.add('active');
+        }
+    }
+
+    function formatMAC(input) {
+        let val = input.value.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+        if (val.length > 12) val = val.substring(0, 12);
+        
+        let formatted = '';
+        for (let i = 0; i < val.length; i++) {
+            if (i > 0 && i % 2 === 0) {
+                formatted += ':';
+            }
+            formatted += val[i];
+        }
+        input.value = formatted;
+    }
+
+    // Open scanner for Serial Barcode
+    function openSerialScanner(inputId) {
+        scanMode = 'serial';
+        activeScannerTarget = document.getElementById(inputId);
+        document.getElementById('scanner-title').innerText = "📷 Scan Serial Barcode";
+        startCamera();
+    }
+
+    // Open scanner for Full QR Code Tag
+    function openFullQRScanner(rowId) {
+        scanMode = 'full_qr';
+        activeScannerTarget = document.getElementById(`row-${rowId}`);
+        document.getElementById('scanner-title').innerText = "📷 Scan Existing Tag QR";
+        startCamera();
+    }
+
+    function startCamera() {
+        document.getElementById('scanner-modal').style.display = 'flex';
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText, decodedResult) => {
+                if (scanMode === 'serial') {
+                    activeScannerTarget.value = decodedText;
+                } else if (scanMode === 'full_qr') {
+                    parseAndFillQRData(decodedText, activeScannerTarget);
+                }
+                closeScanner();
+            },
+            (errorMessage) => { }
+        ).catch(err => {
+            alert("Camera access error: " + err);
+            closeScanner();
+        });
+    }
+
+    // Parses QR text formatted as "Key: Value" lines and populates form fields
+    function parseAndFillQRData(qrText, rowElement) {
+        const lines = qrText.split('\n');
+        const data = {};
+
+        lines.forEach(line => {
+            const parts = line.split(/:\s*(.*)/);
+            if (parts.length >= 2) {
+                const key = parts[0].trim();
+                const val = parts[1].trim();
+                data[key] = (val === 'N/A') ? '' : val;
+            }
+        });
+
+        if (data['Model']) rowElement.querySelector('input[name="model[]"]').value = data['Model'];
+        if (data['Serial No']) rowElement.querySelector('input[name="serial[]"]').value = data['Serial No'];
+        if (data['Processor Details']) rowElement.querySelector('input[name="processor[]"]').value = data['Processor Details'];
+        if (data['IP No']) rowElement.querySelector('input[name="ip[]"]').value = data['IP No'];
+        if (data['Hostname']) rowElement.querySelector('input[name="hostname[]"]').value = data['Hostname'];
+        
+        if (data['MAC address']) {
+            const macInput = rowElement.querySelector('input[name="mac[]"]');
+            macInput.value = data['MAC address'];
+            formatMAC(macInput);
+        }
+
+        // Storage in QR format: "Harddisk | SSD | RAM"
+        if (data['Storage']) {
+            const storageParts = data['Storage'].split('|').map(s => s.trim());
+            if (storageParts.length >= 1 && storageParts[0] !== 'N/A') rowElement.querySelector('input[name="harddisk[]"]').value = storageParts[0];
+            if (storageParts.length >= 2 && storageParts[1] !== 'N/A') rowElement.querySelector('input[name="ssd[]"]').value = storageParts[1];
+            if (storageParts.length >= 3 && storageParts[2] !== 'N/A') rowElement.querySelector('input[name="ram[]"]').value = storageParts[2];
+        }
+    }
+
+    function closeScanner() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                document.getElementById('scanner-modal').style.display = 'none';
+            }).catch(err => {
+                document.getElementById('scanner-modal').style.display = 'none';
+            });
+        } else {
+            document.getElementById('scanner-modal').style.display = 'none';
+        }
+    }
+
+    function addManualRow() {
+        const container = document.getElementById('manual-rows-container');
+        const rowId = Date.now();
+        const rowCount = container.children.length + 1;
+        const serialInputId = `serial-${rowId}`;
+        
+        const rowHTML = `
+            <div class="manual-row" id="row-${rowId}">
+                <div class="row-header">
+                    <button type="button" class="scan-qr-tag-btn" onclick="openFullQRScanner('${rowId}')">📷 Scan Existing Tag QR</button>
+                    ${rowCount > 1 ? `<button type="button" class="remove-btn" onclick="removeManualRow('${rowId}')">X Remove</button>` : ''}
+                </div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Model</label><input type="text" name="model[]" placeholder="e.g. Acer / Dell" required></div>
+                    <div class="form-group">
+                        <label>Serial No</label>
+                        <div class="input-with-btn">
+                            <input type="text" id="${serialInputId}" name="serial[]" placeholder="e.g. UD30HSIOCH" required>
+                            <button type="button" class="scan-btn" onclick="openSerialScanner('${serialInputId}')">📷 Scan Barcode</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group"><label>Processor Details</label><input type="text" name="processor[]" placeholder="e.g. i5 14gen"></div>
+                <div class="grid-2">
+                    <div class="form-group"><label>RAM</label><input type="text" name="ram[]" placeholder="e.g. 8GB"></div>
+                    <div class="form-group"><label>Harddisk</label><input type="text" name="harddisk[]" placeholder="e.g. 1TB"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group"><label>SSD</label><input type="text" name="ssd[]" placeholder="e.g. 256GB"></div>
+                    <div class="form-group"><label>IP No</label><input type="text" name="ip[]" placeholder="e.g. 10.235.2.185"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Hostname</label><input type="text" name="hostname[]" placeholder="e.g. I01153d185"></div>
+                    <div class="form-group"><label>MAC Address</label><input type="text" name="mac[]" placeholder="88:AE:DD:E1:51:96" oninput="formatMAC(this)" maxlength="17"></div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', rowHTML);
+    }
+
+    function removeManualRow(rowId) {
+        document.getElementById(`row-${rowId}`).remove();
+    }
+
+    // Initialize with 1 default row
+    addManualRow();
+</script>
+
 </body>
 </html>
