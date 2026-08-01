@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Asset Tag Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 380px;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>IT Asset Tag Generator</h2>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".xlsx" required>
+            <button type="submit">Word ഫയൽ ഡൗൺലോഡ് ചെയ്യുക</button>
+        </form>
+    </div>
+</body>
+</html>
