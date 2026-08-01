@@ -23,7 +23,9 @@
         label { font-size: 13px; font-weight: 600; color: #333; display: block; margin-bottom: 4px; }
         input[type="text"], input[type="file"] { width: 100%; padding: 9px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
         
-        .input-with-btn { display: flex; gap: 5px; }
+        /* Mobile friendly Serial Input Row */
+        .input-with-btn { display: flex; gap: 6px; }
+        .input-with-btn input { flex: 1; }
         .scan-btn { background: #6f42c1; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; white-space: nowrap; }
         .scan-btn:hover { background: #593196; }
 
@@ -59,7 +61,13 @@
 
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         
-        .manual-row { background: #f8f9fa; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px; position: relative; }
+        /* Mobile responsiveness */
+        @media (max-width: 500px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .container { padding: 15px; }
+        }
+
+        .manual-row { background: #f8f9fa; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 15px; position: relative; }
         .row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .remove-btn { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
         .add-row-btn { background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 15px; width: 100%; }
@@ -172,7 +180,6 @@
         input.value = formatted;
     }
 
-    // Open scanner for Serial Barcode
     function openSerialScanner(inputId) {
         scanMode = 'serial';
         activeScannerTarget = document.getElementById(inputId);
@@ -180,7 +187,6 @@
         startCamera();
     }
 
-    // Open scanner for Full QR Code Tag
     function openFullQRScanner(rowId) {
         scanMode = 'full_qr';
         activeScannerTarget = document.getElementById(`row-${rowId}`);
@@ -209,7 +215,6 @@
         });
     }
 
-    // Parses QR text formatted as "Key: Value" lines and populates form fields
     function parseAndFillQRData(qrText, rowElement) {
         const lines = qrText.split('\n');
         const data = {};
@@ -235,7 +240,6 @@
             formatMAC(macInput);
         }
 
-        // Storage in QR format: "Harddisk | SSD | RAM"
         if (data['Storage']) {
             const storageParts = data['Storage'].split('|').map(s => s.trim());
             if (storageParts.length >= 1 && storageParts[0] !== 'N/A') rowElement.querySelector('input[name="harddisk[]"]').value = storageParts[0];
@@ -269,25 +273,35 @@
                     <button type="button" class="scan-qr-tag-btn" onclick="openFullQRScanner('${rowId}')">📷 Scan Existing Tag QR</button>
                     ${rowCount > 1 ? `<button type="button" class="remove-btn" onclick="removeManualRow('${rowId}')">X Remove</button>` : ''}
                 </div>
+
+                <!-- Row 1: Model & Processor Details -->
                 <div class="grid-2">
                     <div class="form-group"><label>Model</label><input type="text" name="model[]" placeholder="e.g. Acer / Dell" required></div>
-                    <div class="form-group">
-                        <label>Serial No</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="${serialInputId}" name="serial[]" placeholder="e.g. UD30HSIOCH" required>
-                            <button type="button" class="scan-btn" onclick="openSerialScanner('${serialInputId}')">📷 Scan Barcode</button>
-                        </div>
+                    <div class="form-group"><label>Processor Details</label><input type="text" name="processor[]" placeholder="e.g. i5 14gen"></div>
+                </div>
+
+                <!-- Row 2: Serial No with full width for scanner button on mobile -->
+                <div class="form-group">
+                    <label>Serial No</label>
+                    <div class="input-with-btn">
+                        <input type="text" id="${serialInputId}" name="serial[]" placeholder="e.g. UD30HSIOCH" required>
+                        <button type="button" class="scan-btn" onclick="openSerialScanner('${serialInputId}')">📷 Scan Barcode</button>
                     </div>
                 </div>
-                <div class="form-group"><label>Processor Details</label><input type="text" name="processor[]" placeholder="e.g. i5 14gen"></div>
+
+                <!-- Row 3: RAM & Harddisk -->
                 <div class="grid-2">
                     <div class="form-group"><label>RAM</label><input type="text" name="ram[]" placeholder="e.g. 8GB"></div>
-                    <div class="form-group"><label>Harddisk</label><input type="text" name="harddisk[]" placeholder="e.g. 1TB"></div>
+                    <div class="form-group"><label>HDD</label><input type="text" name="harddisk[]" placeholder="e.g. 1TB"></div>
                 </div>
+
+                <!-- Row 4: SSD & IP No -->
                 <div class="grid-2">
                     <div class="form-group"><label>SSD</label><input type="text" name="ssd[]" placeholder="e.g. 256GB"></div>
                     <div class="form-group"><label>IP No</label><input type="text" name="ip[]" placeholder="e.g. 10.235.2.185"></div>
                 </div>
+
+                <!-- Row 5: Hostname & MAC Address -->
                 <div class="grid-2">
                     <div class="form-group"><label>Hostname</label><input type="text" name="hostname[]" placeholder="e.g. I01153d185"></div>
                     <div class="form-group"><label>MAC Address</label><input type="text" name="mac[]" placeholder="88:AE:DD:E1:51:96" oninput="formatMAC(this)" maxlength="17"></div>
