@@ -6,3 +6,4 @@ qrcode
 python-barcode
 pillow
 gunicorn
+xhtml2pdf
