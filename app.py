@@ -4,7 +4,7 @@ import qrcode
 import barcode
 from barcode.writer import ImageWriter
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Cm, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement
@@ -19,7 +19,7 @@ OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Word Document Formatting Helpers
+# Helper: Set Cell Margins (Padding)
 def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
     tcPr = cell._element.get_or_add_tcPr()
     tcMar = OxmlElement('w:tcMar')
@@ -30,6 +30,7 @@ def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
         tcMar.append(node)
     tcPr.append(tcMar)
 
+# Helper: Set Cell Border
 def set_cell_border(cell, color="A0A0A0", sz="6", val="single"):
     tcPr = cell._element.get_or_add_tcPr()
     tcBorders = tcPr.first_child_found_in("w:tcBorders")
@@ -45,14 +46,16 @@ def set_cell_border(cell, color="A0A0A0", sz="6", val="single"):
         element.set(qn('w:color'), color)
         tcBorders.append(element)
 
-# Generate Word Document (.docx)
+# Generate Word Document (.docx) - Exact Sticker Size: 9.5 cm x 7.8 cm
 def build_docx(items):
     doc = Document()
+    
+    # Page setup for A4
     for section in doc.sections:
-        section.top_margin = Inches(0.35)
-        section.bottom_margin = Inches(0.35)
-        section.left_margin = Inches(0.35)
-        section.right_margin = Inches(0.35)
+        section.top_margin = Cm(1.0)
+        section.bottom_margin = Cm(1.0)
+        section.left_margin = Cm(1.0)
+        section.right_margin = Cm(1.0)
 
     chunk_size = 6
     chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
@@ -68,11 +71,14 @@ def build_docx(items):
         for i, row in enumerate(chunk):
             row_idx = i // 2
             col_idx = i % 2
+            
+            # Set exact height & width for each cell (9.5 cm x 7.8 cm)
+            grid_table.rows[row_idx].height = Cm(7.8)
             cell = grid_table.cell(row_idx, col_idx)
-            cell.width = Inches(3.65)
+            cell.width = Cm(9.5)
 
-            set_cell_margins(cell, top=60, bottom=60, left=80, right=80)
-            set_cell_border(cell, color="A0A0A0", sz="6")
+            set_cell_margins(cell, top=80, bottom=80, left=100, right=100)
+            set_cell_border(cell, color="808080", sz="6")
 
             fields = [
                 ("Model", row.get('Model', 'N/A')),
@@ -102,19 +108,19 @@ def build_docx(items):
 
             run_title = p.add_run("IT ASSET TAG\n")
             run_title.bold = True
-            run_title.font.size = Pt(10.5)
+            run_title.font.size = Pt(11)
 
             for label, val in fields:
                 p_item = cell.add_paragraph()
                 p_item.paragraph_format.space_before = Pt(0)
-                p_item.paragraph_format.space_after = Pt(1)
+                p_item.paragraph_format.space_after = Pt(2)
 
                 lbl_run = p_item.add_run(f"{label}: ")
                 lbl_run.bold = True
-                lbl_run.font.size = Pt(8.0)
+                lbl_run.font.size = Pt(8.5)
 
                 val_run = p_item.add_run(str(val))
-                val_run.font.size = Pt(8.0)
+                val_run.font.size = Pt(8.5)
 
             bottom_table = cell.add_table(rows=1, cols=2)
             bottom_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -124,16 +130,16 @@ def build_docx(items):
 
             p_qr = cell_qr.paragraphs[0]
             p_qr.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p_qr.add_run().add_picture(qr_file, width=Inches(0.85))
+            p_qr.add_run().add_picture(qr_file, width=Cm(2.2))
 
             p_bar = cell_bar.paragraphs[0]
             p_bar.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_bar.add_run().add_picture(barcode_file, width=Inches(1.4), height=Inches(0.35))
+            p_bar.add_run().add_picture(barcode_file, width=Cm(3.8), height=Cm(1.0))
 
             p_bar_txt = cell_bar.add_paragraph()
             p_bar_txt.alignment = WD_ALIGN_PARAGRAPH.CENTER
             txt_run = p_bar_txt.add_run(f"*{serial_barcode}*")
-            txt_run.font.size = Pt(7.5)
+            txt_run.font.size = Pt(8.0)
 
             if os.path.exists(qr_file): os.remove(qr_file)
             if os.path.exists(barcode_file): os.remove(barcode_file)
@@ -142,7 +148,7 @@ def build_docx(items):
     doc.save(output_path)
     return output_path
 
-# Generate PDF Document (.pdf)
+# Generate PDF Document (.pdf) - Exact Sticker Size: 9.5 cm x 7.8 cm
 def build_pdf(items):
     temp_images = []
     tags_html = ""
@@ -185,12 +191,12 @@ def build_pdf(items):
             
             <table class="img-table">
                 <tr>
-                    <td style="width:35%; text-align:left;">
-                        <img src="{qr_file}" width="60" height="60" />
+                    <td style="width:35%; text-align:left; vertical-align:middle;">
+                        <img src="{qr_file}" width="65" height="65" />
                     </td>
-                    <td style="width:65%; text-align:center;">
-                        <img src="{barcode_file}" width="110" height="30" /><br>
-                        <span style="font-size: 8px;">*{serial_barcode}*</span>
+                    <td style="width:65%; text-align:center; vertical-align:middle;">
+                        <img src="{barcode_file}" width="120" height="32" /><br>
+                        <span style="font-size: 8px; font-weight: bold;">*{serial_barcode}*</span>
                     </td>
                 </tr>
             </table>
@@ -201,20 +207,22 @@ def build_pdf(items):
     <html>
     <head>
         <style>
-            @page {{ size: A4; margin: 0.5cm; }}
+            @page {{ size: A4; margin: 0.6cm; }}
             body {{ font-family: Helvetica, Arial, sans-serif; margin:0; padding:0; }}
             .tag-box {{
-                width: 45%;
-                border: 1px solid #000;
-                padding: 6px;
+                width: 9.5cm;
+                height: 7.8cm;
+                border: 1px solid #333;
+                padding: 8px 10px;
                 margin: 4px;
                 display: inline-block;
                 vertical-align: top;
                 box-sizing: border-box;
+                overflow: hidden;
             }}
-            .title {{ font-weight: bold; font-size: 11px; margin-bottom: 4px; }}
-            .field {{ font-size: 8px; margin-bottom: 2px; }}
-            .img-table {{ width: 100%; margin-top: 5px; border-collapse: collapse; }}
+            .title {{ font-weight: bold; font-size: 11px; margin-bottom: 5px; text-decoration: underline; }}
+            .field {{ font-size: 8.5px; margin-bottom: 3px; line-height: 1.1; }}
+            .img-table {{ width: 100%; margin-top: 6px; border-collapse: collapse; }}
         </style>
     </head>
     <body>
@@ -254,7 +262,7 @@ def generate():
         df = pd.read_excel(file_path)
         items = df.to_dict('records')
 
-    # 2. Direct Web Entry (Manual / Dynamic Rows)
+    # 2. Direct Web Entry
     elif input_type == 'manual':
         models = request.form.getlist('model[]')
         serials = request.form.getlist('serial[]')
