@@ -19,7 +19,7 @@ OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Helper: Set Cell Margins (Padding) for Word
+# Helper: Word Cell Margins (Padding)
 def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
     tcPr = cell._element.get_or_add_tcPr()
     tcMar = OxmlElement('w:tcMar')
@@ -30,7 +30,7 @@ def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
         tcMar.append(node)
     tcPr.append(tcMar)
 
-# Helper: Set Cell Border for Word
+# Helper: Word Cell Border
 def set_cell_border(cell, color="1A73E8", sz="8", val="single"):
     tcPr = cell._element.get_or_add_tcPr()
     tcBorders = tcPr.first_child_found_in("w:tcBorders")
@@ -46,15 +46,15 @@ def set_cell_border(cell, color="1A73E8", sz="8", val="single"):
         element.set(qn('w:color'), color)
         tcBorders.append(element)
 
-# Generate Word Document (.docx) - 6 Tags per Page Grid (2x3)
+# Generate Word Document (.docx) - 9cm x 8cm Grid
 def build_docx(items):
     doc = Document()
     
     for section in doc.sections:
-        section.top_margin = Cm(0.8)
-        section.bottom_margin = Cm(0.8)
-        section.left_margin = Cm(0.8)
-        section.right_margin = Cm(0.8)
+        section.top_margin = Cm(1.2)
+        section.bottom_margin = Cm(1.2)
+        section.left_margin = Cm(1.0)
+        section.right_margin = Cm(1.0)
 
     chunk_size = 6
     chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
@@ -71,26 +71,26 @@ def build_docx(items):
             row_idx = i // 2
             col_idx = i % 2
             
-            grid_table.rows[row_idx].height = Cm(8.2)
+            grid_table.rows[row_idx].height = Cm(8.0)
             cell = grid_table.cell(row_idx, col_idx)
-            cell.width = Cm(9.5)
+            cell.width = Cm(9.0)
 
-            set_cell_margins(cell, top=80, bottom=80, left=100, right=100)
+            set_cell_margins(cell, top=60, bottom=60, left=80, right=80)
             set_cell_border(cell, color="1A73E8", sz="8")
 
             fields = [
                 ("Model", row.get('Model', 'N/A')),
                 ("Serial No", row.get('Serial No', 'N/A')),
-                ("Processor", row.get('Processor Details', 'N/A')),
+                ("Processor Details", row.get('Processor Details', 'N/A')),
                 ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
                 ("IP No", row.get('IP No', 'N/A')),
                 ("Hostname", row.get('Hostname', 'N/A')),
-                ("MAC Address", row.get('MAC address', 'N/A'))
+                ("MAC address", row.get('MAC address', 'N/A'))
             ]
 
             qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
-            qr_file = os.path.abspath(f"temp_qr_{page_idx}_{i}.png")
-            bar_base = os.path.abspath(f"temp_bar_{page_idx}_{i}")
+            qr_file = os.path.abspath(f"temp_qr_docx_{page_idx}_{i}.png")
+            bar_base = os.path.abspath(f"temp_bar_docx_{page_idx}_{i}")
 
             qr_img = qrcode.make(qr_content)
             qr_img.save(qr_file)
@@ -106,7 +106,8 @@ def build_docx(items):
 
             run_title = p.add_run("IT ASSET TAG\n")
             run_title.bold = True
-            run_title.font.size = Pt(11)
+            run_title.font.name = 'Arial'
+            run_title.font.size = Pt(10)
 
             for label, val in fields:
                 p_item = cell.add_paragraph()
@@ -115,10 +116,12 @@ def build_docx(items):
 
                 lbl_run = p_item.add_run(f"{label}: ")
                 lbl_run.bold = True
-                lbl_run.font.size = Pt(8.5)
+                lbl_run.font.name = 'Arial'
+                lbl_run.font.size = Pt(8)
 
                 val_run = p_item.add_run(str(val))
-                val_run.font.size = Pt(8.5)
+                val_run.font.name = 'Arial'
+                val_run.font.size = Pt(8)
 
             bottom_table = cell.add_table(rows=1, cols=2)
             bottom_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -128,16 +131,17 @@ def build_docx(items):
 
             p_qr = cell_qr.paragraphs[0]
             p_qr.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p_qr.add_run().add_picture(qr_file, width=Cm(2.2))
+            p_qr.add_run().add_picture(qr_file, width=Cm(1.8))
 
             p_bar = cell_bar.paragraphs[0]
             p_bar.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_bar.add_run().add_picture(barcode_file, width=Cm(3.8), height=Cm(1.0))
+            p_bar.add_run().add_picture(barcode_file, width=Cm(3.8), height=Cm(0.9))
 
             p_bar_txt = cell_bar.add_paragraph()
             p_bar_txt.alignment = WD_ALIGN_PARAGRAPH.CENTER
             txt_run = p_bar_txt.add_run(f"*{serial_barcode}*")
-            txt_run.font.size = Pt(7.5)
+            txt_run.font.name = 'Arial'
+            txt_run.font.size = Pt(7)
 
             if os.path.exists(qr_file): os.remove(qr_file)
             if os.path.exists(barcode_file): os.remove(barcode_file)
@@ -146,7 +150,7 @@ def build_docx(items):
     doc.save(output_path)
     return output_path
 
-# Generate PDF Document (.pdf) - Perfect 2x3 Grid (6 Stickers per A4 Page)
+# Generate PDF Document (.pdf) - 9cm x 8cm Layout in Arial
 def build_pdf(items):
     temp_images = []
     
@@ -158,7 +162,6 @@ def build_pdf(items):
     for page_idx, chunk in enumerate(chunks):
         rows_html = ""
         
-        # Process in pairs of 2 items per row
         for r in range(0, len(chunk), 2):
             pair = chunk[r:r+2]
             cols_html = ""
@@ -169,11 +172,11 @@ def build_pdf(items):
                 fields = [
                     ("Model", row.get('Model', 'N/A')),
                     ("Serial No", row.get('Serial No', 'N/A')),
-                    ("Processor", row.get('Processor Details', 'N/A')),
+                    ("Processor Details", row.get('Processor Details', 'N/A')),
                     ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
                     ("IP No", row.get('IP No', 'N/A')),
                     ("Hostname", row.get('Hostname', 'N/A')),
-                    ("MAC Address", row.get('MAC address', 'N/A'))
+                    ("MAC address", row.get('MAC address', 'N/A'))
                 ]
 
                 qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
@@ -190,35 +193,40 @@ def build_pdf(items):
 
                 temp_images.extend([qr_file, barcode_file])
 
+                fields_html = ""
+                for label, val in fields:
+                    fields_html += f"""
+                    <tr>
+                        <td class="lbl">{label}:</td>
+                        <td class="val">{val}</td>
+                    </tr>
+                    """
+
                 sticker_inner = f"""
                 <div class="sticker-card">
                     <div class="sticker-header">IT ASSET TAG</div>
-                    <table class="info-table">
-                        <tr><td class="lbl">Model:</td><td class="val">{row.get('Model', 'N/A')}</td></tr>
-                        <tr><td class="lbl">Serial No:</td><td class="val">{row.get('Serial No', 'N/A')}</td></tr>
-                        <tr><td class="lbl">Processor:</td><td class="val">{row.get('Processor Details', 'N/A')}</td></tr>
-                        <tr><td class="lbl">Storage:</td><td class="val">{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}</td></tr>
-                        <tr><td class="lbl">IP No:</td><td class="val">{row.get('IP No', 'N/A')}</td></tr>
-                        <tr><td class="lbl">Hostname:</td><td class="val">{row.get('Hostname', 'N/A')}</td></tr>
-                        <tr><td class="lbl">MAC Addr:</td><td class="val">{row.get('MAC address', 'N/A')}</td></tr>
-                    </table>
-                    <table class="code-table">
-                        <tr>
-                            <td style="width: 35%; text-align: left; vertical-align: bottom;">
-                                <img src="{qr_file}" width="58" height="58" />
-                            </td>
-                            <td style="width: 65%; text-align: center; vertical-align: bottom;">
-                                <img src="{barcode_file}" width="115" height="28" /><br/>
-                                <span class="serial-txt">*{serial_barcode}*</span>
-                            </td>
-                        </tr>
-                    </table>
+                    <div class="sticker-content">
+                        <table class="info-table">
+                            {fields_html}
+                        </table>
+                        <table class="code-table">
+                            <tr>
+                                <td style="width: 35%; text-align: left; vertical-align: bottom;">
+                                    <img src="{qr_file}" width="52" height="52" />
+                                </td>
+                                <td style="width: 65%; text-align: center; vertical-align: bottom;">
+                                    <img src="{barcode_file}" width="120" height="25" /><br/>
+                                    <span class="serial-txt">*{serial_barcode}*</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
                 """
                 cols_html += f'<td class="sticker-td">{sticker_inner}</td>'
             
             if len(pair) == 1:
-                cols_html += '<td class="sticker-td" style="border:none;"></td>'
+                cols_html += '<td class="sticker-td"></td>'
 
             rows_html += f'<tr>{cols_html}</tr>'
 
@@ -237,10 +245,10 @@ def build_pdf(items):
         <style>
             @page {{
                 size: A4 portrait;
-                margin: 0.8cm 0.6cm 0.8cm 0.6cm;
+                margin: 1.2cm 0.8cm 1.2cm 0.8cm;
             }}
             body {{
-                font-family: Helvetica, Arial, sans-serif;
+                font-family: Arial, Helvetica, sans-serif;
                 margin: 0;
                 padding: 0;
                 background-color: #ffffff;
@@ -248,48 +256,51 @@ def build_pdf(items):
             .page-grid {{
                 width: 100%;
                 border-collapse: separate;
-                border-spacing: 8px 10px;
+                border-spacing: 0.6cm 0.5cm;
             }}
             .sticker-td {{
-                width: 50%;
+                width: 9.0cm;
                 vertical-align: top;
                 padding: 0;
             }}
             .sticker-card {{
-                border: 1px solid #1a73e8;
-                padding: 6px 8px;
-                height: 8.2cm;
-                box-sizing: border-box;
+                border: 1.5pt solid #1a73e8;
+                padding: 0;
                 background-color: #ffffff;
+                font-family: Arial, Helvetica, sans-serif;
             }}
             .sticker-header {{
                 background-color: #1a73e8;
                 color: #ffffff;
+                font-family: Arial, Helvetica, sans-serif;
                 font-weight: bold;
-                font-size: 11px;
+                font-size: 10pt;
                 text-align: center;
-                padding: 3px 0;
-                margin-bottom: 6px;
+                padding: 4px 0;
                 letter-spacing: 0.5px;
+            }}
+            .sticker-content {{
+                padding: 6px 8px;
             }}
             .info-table {{
                 width: 100%;
                 border-collapse: collapse;
-                margin-bottom: 4px;
             }}
             .info-table td {{
-                font-size: 8.5px;
-                padding: 2px 0;
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 8pt;
+                line-height: 1.2;
+                padding: 1.5px 0;
                 vertical-align: top;
             }}
             .lbl {{
                 font-weight: bold;
-                color: #222222;
-                width: 30%;
+                color: #000000;
+                width: 38%;
             }}
             .val {{
-                color: #000000;
-                width: 70%;
+                color: #111111;
+                width: 62%;
             }}
             .code-table {{
                 width: 100%;
@@ -297,9 +308,10 @@ def build_pdf(items):
                 margin-top: 4px;
             }}
             .serial-txt {{
-                font-size: 7.5px;
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 7.5pt;
                 font-weight: bold;
-                color: #333333;
+                color: #222222;
             }}
         </style>
     </head>
@@ -329,7 +341,6 @@ def generate():
 
     items = []
 
-    # 1. Excel File Upload
     if input_type == 'excel':
         file = request.files.get('file')
         if not file or file.filename == '':
@@ -340,7 +351,6 @@ def generate():
         df = pd.read_excel(file_path)
         items = df.to_dict('records')
 
-    # 2. Direct Web Entry
     elif input_type == 'manual':
         models = request.form.getlist('model[]')
         serials = request.form.getlist('serial[]')
