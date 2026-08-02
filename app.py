@@ -20,7 +20,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # Helper: Word Cell Margins
-def set_cell_margins(cell, top=50, bottom=50, left=70, right=70):
+def set_cell_margins(cell, top=60, bottom=60, left=80, right=80):
     tcPr = cell._element.get_or_add_tcPr()
     tcMar = OxmlElement('w:tcMar')
     for m, val in [('top', top), ('bottom', bottom), ('left', left), ('right', right)]:
@@ -46,7 +46,7 @@ def set_cell_border(cell, color="CCCCCC", sz="8", val="single"):
         element.set(qn('w:color'), color)
         tcBorders.append(element)
 
-# Generate Word Document (.docx) - Clean Gray Border
+# Generate Word Document (.docx)
 def build_docx(items):
     doc = Document()
     
@@ -79,13 +79,13 @@ def build_docx(items):
             set_cell_border(cell, color="CCCCCC", sz="8")
 
             fields = [
-                ("Model", row.get('Model', 'N/A')),
-                ("Serial No", row.get('Serial No', 'N/A')),
-                ("Processor Details", row.get('Processor Details', 'N/A')),
-                ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
-                ("IP No", row.get('IP No', 'N/A')),
-                ("Hostname", row.get('Hostname', 'N/A')),
-                ("MAC address", row.get('MAC address', 'N/A'))
+                ("MODEL", row.get('Model', 'N/A')),
+                ("SERIAL NO", row.get('Serial No', 'N/A')),
+                ("PROCESSOR", row.get('Processor Details', 'N/A')),
+                ("STORAGE", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
+                ("IP ADDRESS", row.get('IP No', 'N/A')),
+                ("HOSTNAME", row.get('Hostname', 'N/A')),
+                ("MAC ADDRESS", row.get('MAC address', 'N/A'))
             ]
 
             qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
@@ -102,12 +102,12 @@ def build_docx(items):
 
             p = cell.paragraphs[0]
             p.paragraph_format.space_before = Pt(0)
-            p.paragraph_format.space_after = Pt(2)
+            p.paragraph_format.space_after = Pt(3)
 
             run_title = p.add_run("IT ASSET TAG\n")
             run_title.bold = True
             run_title.font.name = 'Arial'
-            run_title.font.size = Pt(10)
+            run_title.font.size = Pt(11)
 
             for label, val in fields:
                 p_item = cell.add_paragraph()
@@ -117,11 +117,11 @@ def build_docx(items):
                 lbl_run = p_item.add_run(f"{label}: ")
                 lbl_run.bold = True
                 lbl_run.font.name = 'Arial'
-                lbl_run.font.size = Pt(8)
+                lbl_run.font.size = Pt(7.5)
 
                 val_run = p_item.add_run(str(val))
                 val_run.font.name = 'Arial'
-                val_run.font.size = Pt(8)
+                val_run.font.size = Pt(7.5)
 
             bottom_table = cell.add_table(rows=1, cols=2)
             bottom_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -131,11 +131,11 @@ def build_docx(items):
 
             p_qr = cell_qr.paragraphs[0]
             p_qr.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p_qr.add_run().add_picture(qr_file, width=Cm(1.8))
+            p_qr.add_run().add_picture(qr_file, width=Cm(1.7))
 
             p_bar = cell_bar.paragraphs[0]
             p_bar.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_bar.add_run().add_picture(barcode_file, width=Cm(3.8), height=Cm(0.9))
+            p_bar.add_run().add_picture(barcode_file, width=Cm(3.8), height=Cm(0.8))
 
             p_bar_txt = cell_bar.add_paragraph()
             p_bar_txt.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -150,7 +150,7 @@ def build_docx(items):
     doc.save(output_path)
     return output_path
 
-# Generate PDF Document (.pdf) - Clean Layout with Gray Border & No Inner Columns
+# Generate PDF Document (.pdf) - Photo Style Matching Design
 def build_pdf(items):
     temp_images = []
     
@@ -165,7 +165,6 @@ def build_pdf(items):
         for i, row in enumerate(chunk):
             idx = page_idx * 6 + i
             
-            # Position logic: 2 columns x 3 rows
             col = i % 2
             r = i // 2
             
@@ -173,13 +172,13 @@ def build_pdf(items):
             top_pos = f"{r * 8.4}cm"
             
             fields = [
-                ("Model", row.get('Model', 'N/A')),
-                ("Serial No", row.get('Serial No', 'N/A')),
-                ("Processor Details", row.get('Processor Details', 'N/A')),
-                ("Storage", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
-                ("IP No", row.get('IP No', 'N/A')),
-                ("Hostname", row.get('Hostname', 'N/A')),
-                ("MAC address", row.get('MAC address', 'N/A'))
+                ("MODEL", row.get('Model', 'N/A')),
+                ("SERIAL NO", row.get('Serial No', 'N/A')),
+                ("PROCESSOR", row.get('Processor Details', 'N/A')),
+                ("STORAGE", f"{row.get('Harddisk','N/A')} | {row.get('SSD','N/A')} | {row.get('RAM','N/A')}"),
+                ("IP ADDRESS", row.get('IP No', 'N/A')),
+                ("HOSTNAME", row.get('Hostname', 'N/A')),
+                ("MAC ADDRESS", row.get('MAC address', 'N/A'))
             ]
 
             qr_content = "\n".join([f"{l}: {v}" for l, v in fields])
@@ -207,17 +206,20 @@ def build_pdf(items):
 
             sticker_box = f"""
             <div class="sticker-card" style="left: {left_pos}; top: {top_pos};">
-                <div class="sticker-header">IT ASSET TAG</div>
+                <div class="header-row">
+                    <span class="sticker-title">IT ASSET TAG</span>
+                    <span class="sticker-logo">T</span>
+                </div>
                 <div class="fields-container">
                     {field_lines}
                 </div>
                 <table class="code-table">
                     <tr>
                         <td style="width: 35%; text-align: left; vertical-align: bottom;">
-                            <img src="{qr_file}" width="50" height="50" />
+                            <img src="{qr_file}" width="48" height="48" />
                         </td>
                         <td style="width: 65%; text-align: center; vertical-align: bottom;">
-                            <img src="{barcode_file}" width="115" height="26" /><br/>
+                            <img src="{barcode_file}" width="115" height="24" /><br/>
                             <span class="serial-txt">*{serial_barcode}*</span>
                         </td>
                     </tr>
@@ -252,8 +254,6 @@ def build_pdf(items):
                 width: 19.0cm;
                 height: 26.5cm;
             }}
-            
-            /* Clean Sticker Styling with Gray Border & No Column Dividers */
             .sticker-card {{
                 position: absolute;
                 width: 9.0cm;
@@ -263,30 +263,43 @@ def build_pdf(items):
                 box-sizing: border-box;
                 background-color: #ffffff;
             }}
-            .sticker-header {{
+            .header-row {{
+                width: 100%;
+                margin-bottom: 6px;
+                border-bottom: 1.5px solid #000000;
+                padding-bottom: 3px;
+            }}
+            .sticker-title {{
                 font-family: Arial, Helvetica, sans-serif;
                 font-weight: bold;
-                font-size: 10.5pt;
-                text-align: left;
+                font-size: 11pt;
                 color: #000000;
-                margin-bottom: 6px;
-                text-decoration: underline;
+                letter-spacing: 0.5px;
+            }}
+            .sticker-logo {{
+                float: right;
+                font-family: Arial, Helvetica, sans-serif;
+                font-weight: bold;
+                font-size: 12pt;
+                color: #000000;
             }}
             .fields-container {{
-                margin-bottom: 6px;
+                margin-bottom: 4px;
             }}
             .line {{
-                font-size: 8pt;
-                line-height: 1.3;
-                margin-bottom: 2px;
+                font-size: 7.5pt;
+                line-height: 1.25;
+                margin-bottom: 1.5px;
             }}
             .lbl {{
                 font-weight: bold;
                 color: #000000;
                 display: inline-block;
+                width: 33%;
             }}
             .val {{
                 color: #222222;
+                font-weight: 600;
             }}
             .code-table {{
                 width: 100%;
@@ -297,7 +310,7 @@ def build_pdf(items):
                 right: 10px;
             }}
             .serial-txt {{
-                font-size: 7.5pt;
+                font-size: 7pt;
                 font-weight: bold;
                 color: #222222;
             }}
